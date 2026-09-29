@@ -49,7 +49,19 @@ A verified response must contain a boolean. <code>false</code> emits
 ## Framework integrations
 
 The same custom element works with Vue, Next.js, Nuxt, Astro, and Svelte. The
-framework code only registers the element and listens for its events:
+framework code only registers the element and listens for its events. These
+framework examples are also available as package subpaths:
+
+- `@dlbr/eid-age-check/vue`
+- `@dlbr/eid-age-check/svelte`
+- `@dlbr/eid-age-check/react` or `@dlbr/eid-age-check/nextjs`
+- `@dlbr/eid-age-check/astro`
+- `@dlbr/eid-age-check/nuxt` (Nuxt client plugin)
+
+For example, import the Vue component with
+`import AgeCheck from "@dlbr/eid-age-check/vue"`. These subpaths point to the
+framework source files included in the package, so the consuming app needs its
+usual Vue, Svelte, React/Next.js, Astro, or Nuxt compiler/plugin configured.
 
 - [Vue](./examples/vue/AgeCheck.vue)
 - [Next.js](./examples/nextjs/AgeCheck.tsx)
