@@ -1,0 +1,10 @@
+node_modules/
+dist/
+types/
+coverage/
+playwright-report/
+test-results/
+*.tgz
+.env
+.env.*
+!.env.example

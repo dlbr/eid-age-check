@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wallet age check</title>
+  </head>
+  <body>
+    <dlbr-age-check endpoint="/api/age-check"></dlbr-age-check>
+    <section id="restricted-content" hidden>
+      <h1>Welcome</h1>
+      <p>Your site decides what to show after the verified result.</p>
+    </section>
+    <script type="module">
+      import { registerAgeCheckElement } from "@dlbr/eid-age-check";
+
+      registerAgeCheckElement();
+      document.querySelector("dlbr-age-check").addEventListener("age-verified", () => {
+        document.querySelector("#restricted-content").hidden = false;
+      });
+    </script>
+  </body>
+</html>

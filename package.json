@@ -1,0 +1,63 @@
+{
+  "name": "@dlbr/eid-age-check",
+  "version": "0.1.0",
+  "description": "Framework-neutral EUDI Wallet age-check button for websites",
+  "keywords": [
+    "dlbr",
+    "eudi",
+    "age-verification",
+    "web-component",
+    "oid4vp"
+  ],
+  "homepage": "https://github.com/dlbr/eid-age-check#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/dlbr/eid-age-check.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dlbr/eid-age-check/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "types",
+    "README.md",
+    "examples"
+  ],
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "unpkg": "./dist/dlbr-age-check.iife.js",
+  "jsdelivr": "./dist/dlbr-age-check.iife.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.types.json && vite build && vite build --config vite.iife.config.ts",
+    "test": "tsc -p tsconfig.test.json --noEmit && vitest run",
+    "test:coverage": "tsc -p tsconfig.test.json --noEmit && vitest run --coverage",
+    "test:e2e": "pnpm run build && playwright test",
+    "validate": "pnpm run build && pnpm run test:coverage && pnpm run test:e2e",
+    "pack:check": "pnpm run build && pnpm pack --pack-destination ."
+  },
+  "dependencies": {
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.6.2",
+    "@vitest/coverage-v8": "4.1.11",
+    "happy-dom": "20.14.5",
+    "typescript": "7.0.2",
+    "vite": "8.3.1",
+    "vitest": "4.1.11"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@10.14.0"
+}
