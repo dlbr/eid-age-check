@@ -20,7 +20,7 @@
     {
       "binding": "SESSIONS",
       "database_name": "eid-age-check-demo",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "32311f44-102c-4764-86ef-21040284bfa7",
       "migrations_dir": "./migrations"
     }
   ],

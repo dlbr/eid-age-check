@@ -78,19 +78,19 @@ jobs:
           }
           NODE
 
-      - name: Set D1 database ID
+      - name: Verify D1 database ID
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         working-directory: examples/cloudflare-worker
         env:
           D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
         run: |
           node --input-type=module <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs';
-          const path = 'wrangler.jsonc';
-          const config = readFileSync(path, 'utf8');
-          const placeholder = '00000000-0000-0000-0000-000000000000';
-          if (!config.includes(placeholder)) throw new Error('D1 database placeholder was not found.');
-          writeFileSync(path, config.replace(placeholder, process.env.D1_DATABASE_ID));
+          import { readFileSync } from 'node:fs';
+          const config = readFileSync('wrangler.jsonc', 'utf8');
+          const configuredId = /"database_id"\s*:\s*"([^"]+)"/.exec(config)?.[1];
+          if (configuredId !== process.env.D1_DATABASE_ID) {
+            throw new Error('wrangler.jsonc database_id must match the D1_DATABASE_ID repository variable.');
+          }
           NODE
 
       - name: Apply D1 migrations
