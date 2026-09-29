@@ -44,6 +44,13 @@ jobs:
             examples/cloudflare-worker/pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run test:coverage
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm run test:e2e
+
       - run: pnpm install --frozen-lockfile
         working-directory: examples/cloudflare-worker
       - run: pnpm run build
