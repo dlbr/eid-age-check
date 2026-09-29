@@ -67,7 +67,7 @@ function isBusy(state: ViewState): boolean {
 }
 
 /** Creates a browser custom element that drives the merchant-owned age-check endpoints. */
-export function createAgeCheckElementClass(): CustomElementConstructor {
+export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementConstructor {
   return class DlbrAgeCheckElement extends HTMLElement {
     private state: ViewState = "idle";
     private polling = false;
@@ -141,7 +141,7 @@ export function createAgeCheckElementClass(): CustomElementConstructor {
       this.busy = true;
       this.setState("starting");
       try {
-        const endpoint = this.getAttribute("endpoint") ?? "";
+        const endpoint = this.getAttribute("endpoint") ?? defaultEndpoint;
         const baseURI = document.baseURI;
         const response = await fetch(createSessionUrl(endpoint, baseURI), {
           method: "POST",
@@ -245,10 +245,11 @@ export function createAgeCheckElementClass(): CustomElementConstructor {
 export function registerAgeCheckElement(
   tagName = defaultTagName,
   registry: CustomElementRegistry | null = typeof customElements === "undefined" ? null : customElements,
+  defaultEndpoint = "",
 ): boolean {
   const normalizedName = tagName.trim().toLowerCase();
   if (!registry || typeof HTMLElement === "undefined" || !normalizedName.includes("-")) return false;
   if (registry.get(normalizedName)) return false;
-  registry.define(normalizedName, createAgeCheckElementClass());
+  registry.define(normalizedName, createAgeCheckElementClass(defaultEndpoint));
   return true;
 }

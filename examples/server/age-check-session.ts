@@ -1,16 +1,15 @@
-import { EidClient } from "@dlbr/eid-sdk";
+import { DlbrId } from "@dlbr/eid-sdk";
 
-const id = new EidClient({
+const id = new DlbrId({
+  baseUrl: process.env.DLBR_EID_BASE_URL ?? "https://api.dlbr.app",
   apiKey: process.env.DLBR_EID_API_KEY!,
 });
 
 const issuerId = process.env.DLBR_EID_AGE_ISSUER_ID!;
-const intendedUseId = process.env.DLBR_EID_AGE_INTENDED_USE_ID!;
 
 /** Creates a minimum-disclosure Proof of Age session on the server. */
 export async function createAgeCheckSession() {
   const session = await id.sessions.create({
-    intended_use_id: intendedUseId,
     credentials: [{
       id: "proof-of-age",
       format: "mso_mdoc",

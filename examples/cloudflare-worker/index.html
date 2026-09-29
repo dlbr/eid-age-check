@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Age check · Cloudflare Workers demo</title>
+    <style>
+      :root { font: 16px/1.5 system-ui, sans-serif; color: #172033; background: #f5f7fa; }
+      body { box-sizing: border-box; max-width: 48rem; margin: 0 auto; padding: 3rem 1.25rem; }
+      h1 { margin-bottom: .25rem; font-size: clamp(1.8rem, 5vw, 2.5rem); }
+      .intro, .note { color: #475569; }
+      #restricted-content { margin-top: 1rem; padding: 1rem 1.25rem; border: 1px solid #bbf7d0; border-radius: .75rem; background: #f0fdf4; }
+      #restricted-content[hidden] { display: none; }
+      .note { margin-top: 2rem; font-size: .9rem; }
+      dlbr-age-check { --dlbr-age-check-primary: #14532d; --dlbr-age-check-focus: #a3e635; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Wallet age check</h1>
+      <p class="intro">Verify the over-18 condition with a supported digital identity wallet.</p>
+      <dlbr-age-check endpoint="/api/age-check"></dlbr-age-check>
+      <section id="restricted-content" aria-live="polite" hidden>
+        <h2>Age verified</h2>
+        <p>Your application decides what access to grant after verification.</p>
+      </section>
+      <p class="note">Demo only: configure your Gateway credentials and Proof of Age issuer before starting.</p>
+    </main>
+    <script type="module" src="/src/client.js"></script>
+  </body>
+</html>

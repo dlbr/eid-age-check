@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "eid-age-check-demo",
+  "main": "./worker.js",
+  "compatibility_date": "2026-09-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "demo.dlbr.app", "custom_domain": true }
+  ],
+  "vars": {
+    "DLBR_EID_BASE_URL": "https://api.dlbr.app",
+    "DLBR_EID_AGE_ISSUER_ID": "https://issuer.eudiw.dev"
+  },
+  "assets": {
+    "directory": "./dist",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "SESSIONS",
+      "database_name": "eid-age-check-demo",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "./migrations"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

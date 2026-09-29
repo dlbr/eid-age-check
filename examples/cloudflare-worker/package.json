@@ -1,0 +1,17 @@
+{
+  "name": "@dlbr/eid-age-check-cloudflare-worker-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "pnpm run build && wrangler dev",
+    "deploy": "pnpm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "@dlbr/eid-sdk": "0.1.0-beta.2"
+  },
+  "devDependencies": {
+    "vite": "8.3.1",
+    "wrangler": "4.143.1"
+  }
+}

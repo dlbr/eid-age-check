@@ -37,7 +37,11 @@
     "./react": "./examples/nextjs/AgeCheck.tsx",
     "./nextjs": "./examples/nextjs/AgeCheck.tsx",
     "./astro": "./examples/astro/AgeCheck.astro",
-    "./nuxt": "./examples/nuxt/plugins/dlbr-age-check.client.ts"
+    "./nuxt": {
+      "types": "./examples/nuxt/module.d.ts",
+      "import": "./examples/nuxt/module.ts"
+    },
+    "./nuxt/plugin": "./examples/nuxt/plugins/dlbr-age-check.client.ts"
   },
   "unpkg": "./dist/dlbr-age-check.iife.js",
   "jsdelivr": "./dist/dlbr-age-check.iife.js",
@@ -50,7 +54,17 @@
     "pack:check": "pnpm run build && pnpm pack --pack-destination ."
   },
   "dependencies": {
+    "@dlbr/eid-sdk": "^0.1.0-beta.2",
+    "h3": "^1.15.4",
     "qrcode": "1.5.4"
+  },
+  "peerDependencies": {
+    "@nuxt/kit": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@nuxt/kit": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

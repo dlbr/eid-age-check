@@ -56,7 +56,8 @@ framework examples are also available as package subpaths:
 - `@dlbr/eid-age-check/svelte`
 - `@dlbr/eid-age-check/react` or `@dlbr/eid-age-check/nextjs`
 - `@dlbr/eid-age-check/astro`
-- `@dlbr/eid-age-check/nuxt` (Nuxt client plugin)
+- `@dlbr/eid-age-check/nuxt` (Nuxt module)
+- `@dlbr/eid-age-check/nuxt/plugin` (manual Nuxt client plugin)
 
 For example, import the Vue component with
 `import AgeCheck from "@dlbr/eid-age-check/vue"`. These subpaths point to the
@@ -65,13 +66,56 @@ usual Vue, Svelte, React/Next.js, Astro, or Nuxt compiler/plugin configured.
 
 - [Vue](./examples/vue/AgeCheck.vue)
 - [Next.js](./examples/nextjs/AgeCheck.tsx)
-- [Nuxt client plugin](./examples/nuxt/plugins/dlbr-age-check.client.ts)
+- [Nuxt module](./examples/nuxt/README.md)
 - [Astro](./examples/astro/AgeCheck.astro)
 - [Svelte](./examples/svelte/AgeCheck.svelte)
 - [Plain JavaScript](./examples/plain-javascript/index.html)
 
 Next.js and Nuxt render the element on the client. Their server routes call the
-DLBR SDK and protect the API key.
+DLBR SDK and protect the API key. The Nuxt module below registers both sides
+for you.
+
+### Nuxt module
+
+Install `@dlbr/eid-age-check` and add its module to `nuxt.config.ts`:
+
+~~~~ts
+export default defineNuxtConfig({
+  modules: ["@dlbr/eid-age-check/nuxt"],
+});
+~~~~
+
+Set these server-only runtime environment variables:
+
+- `NUXT_DLBR_AGE_CHECK_API_KEY`: active DLBR Gateway API key.
+- `NUXT_DLBR_AGE_CHECK_ISSUER_ID`: trusted Proof of Age issuer ID.
+- `NUXT_DLBR_AGE_CHECK_COOKIE_SECRET`: random secret of at least 32 bytes.
+
+Then use the widget without wiring its endpoint or registering the custom
+element yourself:
+
+~~~~vue
+<template>
+  <dlbr-age-check @age-verified="ageVerified = true" />
+  <section v-if="ageVerified">Age verified. Apply your own access rules.</section>
+</template>
+
+<script setup lang="ts">
+const ageVerified = ref(false);
+</script>
+~~~~
+
+The module registers a client-only custom-element plugin and same-origin
+server handlers at `/api/dlbr/age-check/sessions` and
+`/api/dlbr/age-check/sessions/:sessionId`. It binds the Gateway session to the
+browser that created it with a signed, `HttpOnly`, `SameSite=Strict` cookie.
+The API key and cookie secret stay in private Nuxt runtime config. Configure
+the values through runtime environment variables; do not put secrets in module
+options or `runtimeConfig.public`. See [the complete Nuxt setup](./examples/nuxt/README.md)
+for custom endpoints, Gateway origins, and deployment notes.
+
+For a plain JavaScript frontend with a Cloudflare Worker API and D1-backed
+session binding, see the [Cloudflare Workers demo](./examples/cloudflare-worker/README.md).
 
 ## Server contract and age request
 
