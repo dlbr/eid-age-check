@@ -23,6 +23,7 @@ function getGateway(env) {
   return new DlbrId({
     baseUrl: env.DLBR_EID_BASE_URL,
     apiKey: env.DLBR_EID_API_KEY,
+    fetch: globalThis.fetch.bind(globalThis),
     maxNetworkRetries: 1,
     timeoutMs: 10_000,
   });
