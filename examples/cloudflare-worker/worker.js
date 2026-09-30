@@ -29,6 +29,14 @@ function getGateway(env) {
 }
 
 function logSessionFailure(stage, error) {
+  const cause = error?.cause;
+  const nestedCause = cause?.cause;
+  const safeName = (value) => value instanceof Error && /^[A-Za-z0-9_]{1,64}$/.test(value.name)
+    ? value.name
+    : undefined;
+  const safeCode = (value) => typeof value === "string" && /^[A-Z0-9_]{1,64}$/.test(value)
+    ? value
+    : undefined;
   const details = {
     operation: "create_age_check_session",
     stage,
@@ -41,6 +49,10 @@ function logSessionFailure(stage, error) {
     requestId: typeof error?.requestId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(error.requestId)
       ? error.requestId
       : undefined,
+    causeName: safeName(cause),
+    causeCode: safeCode(cause?.code),
+    nestedCauseName: safeName(nestedCause),
+    nestedCauseCode: safeCode(nestedCause?.code),
   };
   console.error("Age-check session creation failed", details);
 }
