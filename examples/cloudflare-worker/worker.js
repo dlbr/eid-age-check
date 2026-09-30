@@ -28,6 +28,23 @@ function getGateway(env) {
   });
 }
 
+function logSessionFailure(stage, error) {
+  const details = {
+    operation: "create_age_check_session",
+    stage,
+    name: error instanceof Error ? error.name : "UnknownError",
+    kind: typeof error?.kind === "string" ? error.kind : undefined,
+    status: Number.isInteger(error?.status) ? error.status : undefined,
+    code: typeof error?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(error.code)
+      ? error.code
+      : undefined,
+    requestId: typeof error?.requestId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(error.requestId)
+      ? error.requestId
+      : undefined,
+  };
+  console.error("Age-check session creation failed", details);
+}
+
 function readCookie(request, name) {
   const prefix = `${name}=`;
   const value = request.headers.get("Cookie");
@@ -65,8 +82,10 @@ async function createSession(request, env, url) {
     return jsonResponse({ error: "Origin not allowed." }, 403);
   }
 
+  let stage = "gateway_configuration";
   try {
     const gateway = getGateway(env);
+    stage = "gateway_session_create";
     const session = await gateway.sessions.create({
       credentials: [{
         id: "proof-of-age",
@@ -83,11 +102,13 @@ async function createSession(request, env, url) {
     const browserToken = existingToken && /^[A-Za-z0-9_-]{43}$/.test(existingToken)
       ? existingToken
       : newBrowserToken();
+    stage = "gateway_session_response_validation";
     const expiresAt = Date.parse(session.expires_at);
     if (!session.session_id || !session.qr_code_url || !Number.isFinite(expiresAt)) {
       throw new Error("The Gateway returned an invalid session response.");
     }
 
+    stage = "d1_session_persist";
     await env.SESSIONS.prepare(
       "INSERT INTO age_check_sessions (session_id, browser_token_hash, expires_at) VALUES (?, ?, ?)",
     ).bind(session.session_id, await hashToken(browserToken), expiresAt).run();
@@ -97,7 +118,8 @@ async function createSession(request, env, url) {
       201,
       { "Set-Cookie": cookieHeader(browserToken, url) },
     );
-  } catch {
+  } catch (error) {
+    logSessionFailure(stage, error);
     return jsonResponse({ error: "Could not start age verification." }, 503);
   }
 }
