@@ -24,9 +24,13 @@ pnpm exec wrangler d1 create eid-age-check-demo
 ```
 
 The Worker uses the DLBR production API base URL and EUDI reference Proof of Age
-issuer by default; change those `vars` in `wrangler.jsonc` if needed. For local
-development, copy `.dev.vars.example` to `.dev.vars` and enter a test API key.
-Apply the schema to the local D1 database:
+issuer by default; change those `vars` in `wrangler.jsonc` if needed. Register an
+intended use for the relying party that permits this issuer, `mso_mdoc`, the
+`eu.europa.ec.av.1` document type, and the `age_over_18` claim. Set
+`DLBR_EID_INTENDED_USE_ID` to that exact registered `intendedUseIdentifier`.
+For local development, copy `.dev.vars.example` to `.dev.vars`, then enter a
+test API key and the intended-use identifier. Apply the schema to the local D1
+database:
 
 ```sh
 cp .dev.vars.example .dev.vars
@@ -59,6 +63,8 @@ those checks pass. Configure these GitHub repository settings:
   permissions for the `dlbr.app` zone.
 - Secret `DLBR_EID_API_KEY`: a test-mode Gateway key. CI stores it in the Worker
   secret store; it is never written to `wrangler.jsonc` or the repository.
+- Variable `DLBR_EID_INTENDED_USE_ID`: the exact registered intended-use
+  identifier for the Proof of Age request.
 - Variable `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account that owns `dlbr.app`.
 - Variable `D1_DATABASE_ID`: the UUID returned by `wrangler d1 create` for the
   demo database.

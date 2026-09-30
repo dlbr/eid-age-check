@@ -16,7 +16,12 @@ function jsonResponse(body, status = 200, headers = {}) {
 }
 
 function getGateway(env) {
-  if (!env.DLBR_EID_BASE_URL || !env.DLBR_EID_API_KEY || !env.DLBR_EID_AGE_ISSUER_ID) {
+  if (
+    !env.DLBR_EID_BASE_URL ||
+    !env.DLBR_EID_API_KEY ||
+    !env.DLBR_EID_AGE_ISSUER_ID ||
+    !env.DLBR_EID_INTENDED_USE_ID
+  ) {
     throw new Error("The Gateway configuration is incomplete.");
   }
 
@@ -100,6 +105,7 @@ async function createSession(request, env, url) {
     const gateway = getGateway(env);
     stage = "gateway_session_create";
     const session = await gateway.sessions.create({
+      intended_use_id: env.DLBR_EID_INTENDED_USE_ID,
       credentials: [{
         id: "proof-of-age",
         format: "mso_mdoc",

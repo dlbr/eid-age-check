@@ -1,1 +1,2 @@
 DLBR_EID_API_KEY="replace-with-a-server-side-api-key"
+DLBR_EID_INTENDED_USE_ID="replace-with-a-registered-intended-use-id"
