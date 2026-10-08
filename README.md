@@ -37,6 +37,8 @@ The endpoint attribute points to merchant-owned routes:
 
 - <code>POST /api/age-check/sessions</code> creates a Gateway session and
   returns <code>{ "session_id": "...", "qr_code_url": "openid4vp://..." }</code>.
+  The Age Verification app uses <code>av://...</code>; the component also accepts
+  this scheme and HTTPS wallet links.
 - <code>GET /api/age-check/sessions/{session_id}</code> returns
   <code>{ "status": "PENDING" }</code>, <code>{ "status": "FAILED" }</code>,
   <code>{ "status": "EXPIRED" }</code>, or

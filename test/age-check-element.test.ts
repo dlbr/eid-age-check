@@ -62,11 +62,12 @@ describe("age-check custom element", () => {
     expect(registerAgeCheckElement("dlbr-age-check-unavailable", null)).toBe(false);
   });
 
-  it("shows a pending wallet request with both QR and deep link", async () => {
+  it.each(["openid4vp", "av"])("shows a pending %s wallet request with both QR and deep link", async (scheme) => {
+    const walletUrl = `${scheme}://authorize?request_uri=https%3A%2F%2Fwallet.example%2Fr`;
     vi.mocked(fetch)
       .mockResolvedValueOnce(response({
         session_id: "session-1",
-        qr_code_url: "openid4vp://authorize?request_uri=https%3A%2F%2Fwallet.example%2Fr",
+        qr_code_url: walletUrl,
       }) as Response)
       .mockResolvedValueOnce(response({ status: "PENDING" }) as Response);
 
@@ -77,7 +78,7 @@ describe("age-check custom element", () => {
 
     expect(shadow(widget).querySelector(".status")?.textContent).toContain("Scan the code");
     expect(shadow(widget).querySelector<HTMLImageElement>(".qr")?.src).toBe("data:image/png;base64,e2e");
-    expect(shadow(widget).querySelector<HTMLAnchorElement>(".wallet-link")?.href).toContain("openid4vp://");
+    expect(shadow(widget).querySelector<HTMLAnchorElement>(".wallet-link")?.href).toBe(walletUrl);
     expect(fetch).toHaveBeenNthCalledWith(1, new URL("https://shop.example/api/age-check/sessions"), expect.objectContaining({
       method: "POST",
       credentials: "same-origin",

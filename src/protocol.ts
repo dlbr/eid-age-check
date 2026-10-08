@@ -81,9 +81,9 @@ export function validateWalletRequestUrl(value: unknown): string {
     throw new AgeCheckProtocolError("The wallet request URL is invalid.");
   }
 
-  if (url.protocol === "openid4vp:") return value;
+  if (url.protocol === "openid4vp:" || url.protocol === "av:") return value;
   if (url.protocol === "https:" && url.hostname !== "") return value;
-  throw new AgeCheckProtocolError("The wallet request URL must use OpenID4VP or HTTPS.");
+  throw new AgeCheckProtocolError("The wallet request URL must use OpenID4VP, AV, or HTTPS.");
 }
 
 /** Validates the minimal response returned by the merchant's session creation endpoint. */

@@ -61,10 +61,12 @@ describe("endpoint URL helpers", () => {
 });
 
 describe("wallet URL validation", () => {
-  it("accepts OpenID4VP and HTTPS request URLs", () => {
+  it("accepts OpenID4VP, Age Verification, and HTTPS request URLs", () => {
     expect(validateWalletRequestUrl("openid4vp://authorize?request_uri=https%3A%2F%2Fwallet.example%2Fr"))
       .toContain("openid4vp://");
     expect(validateWalletRequestUrl("https://wallet.example/request")).toBe("https://wallet.example/request");
+    expect(validateWalletRequestUrl("av://?request_uri=https%3A%2F%2Fwallet.example%2Fr"))
+      .toBe("av://?request_uri=https%3A%2F%2Fwallet.example%2Fr");
   });
 
   it.each([
@@ -75,6 +77,8 @@ describe("wallet URL validation", () => {
     "javascript:alert(1)",
     "http://wallet.example/request",
     "openid4vp://wallet.example/a b",
+    "av://wallet.example/a b",
+    "arbitrary-wallet://authorize",
     "https://",
   ])("rejects an unsafe or malformed wallet URL (%j)", (value) => {
     expect(() => validateWalletRequestUrl(value)).toThrow(AgeCheckProtocolError);
