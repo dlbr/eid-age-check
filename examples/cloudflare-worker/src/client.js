@@ -8,13 +8,14 @@ widget?.addEventListener("age-verified", () => {
   document.querySelector("#demo-help").hidden = true;
 });
 
-widget?.addEventListener("age-verification-error", (event) => {
+function showDemoFailure(event) {
   const help = document.querySelector("#demo-help");
   if (!help) return;
   help.hidden = true;
 
   const detail = event.detail;
   const messages = {
+    ISSUER_TRUST_INVALID: "The Test Gateway could not validate the Proof of Age issuer's certificate against its trusted list. Age verification could not be completed. Please try again after the demo's issuer trust setup has been updated.",
     ISSUER_NOT_ALLOWED: "The Test Gateway has not enabled the Proof of Age issuer for this demo yet. This is a demo setup issue; please try again later.",
     INTENDED_USE_NOT_ACTIVE: "The Test Gateway has not activated the Proof of Age policy for this demo yet. Please try again later.",
   };
@@ -24,4 +25,10 @@ widget?.addEventListener("age-verification-error", (event) => {
   help.textContent = message;
   if (detail.request_id) help.textContent += ` Support reference: ${detail.request_id}.`;
   help.hidden = false;
+}
+
+widget?.addEventListener("age-verification-error", showDemoFailure);
+widget?.addEventListener("age-verification-failed", showDemoFailure);
+widget?.addEventListener("age-verification-expired", () => {
+  document.querySelector("#demo-help").hidden = true;
 });

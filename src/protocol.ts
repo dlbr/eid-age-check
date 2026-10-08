@@ -3,11 +3,14 @@ export type AgeCheckStatus = "PENDING" | "VERIFIED" | "FAILED" | "EXPIRED";
 export interface CreateAgeCheckSessionResponse {
   session_id: string;
   qr_code_url: string;
+  expires_at?: string;
 }
 
 export interface AgeCheckSessionResponse {
   status: AgeCheckStatus;
   age_over_18?: boolean;
+  code?: "ISSUER_TRUST_INVALID";
+  request_id?: string;
 }
 
 /** Error raised when a merchant endpoint violates the widget's response contract. */
@@ -94,9 +97,15 @@ export function parseCreateSessionResponse(value: unknown): CreateAgeCheckSessio
   if (typeof value.session_id !== "string" || value.session_id.trim() === "" || value.session_id.length > 256) {
     throw new AgeCheckProtocolError("The age-check session identifier is invalid.");
   }
+  if (value.expires_at !== undefined && (
+    typeof value.expires_at !== "string" || !Number.isFinite(Date.parse(value.expires_at))
+  )) {
+    throw new AgeCheckProtocolError("The age-check session expiration is invalid.");
+  }
   return {
     session_id: value.session_id,
     qr_code_url: validateWalletRequestUrl(value.qr_code_url),
+    ...(value.expires_at !== undefined ? { expires_at: value.expires_at as string } : {}),
   };
 }
 
@@ -114,6 +123,15 @@ export function parseAgeCheckSessionResponse(value: unknown): AgeCheckSessionRes
     }
     return { status, age_over_18: value.age_over_18 };
   }
-  if (status === "FAILED" || status === "EXPIRED") return { status };
+  if (status === "FAILED") {
+    return {
+      status,
+      ...(value.code === "ISSUER_TRUST_INVALID" ? { code: value.code } : {}),
+      ...(typeof value.request_id === "string" && /^req_[A-Za-z0-9_-]{1,128}$/.test(value.request_id)
+        ? { request_id: value.request_id }
+        : {}),
+    };
+  }
+  if (status === "EXPIRED") return { status };
   throw new AgeCheckProtocolError("The age-check status is unsupported.");
 }

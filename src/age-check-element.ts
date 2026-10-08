@@ -20,11 +20,14 @@ const template = [
   ".description{margin:0 0 1rem;line-height:1.5;color:var(--dlbr-age-check-muted,#475569)}",
   ".button{min-height:2.75rem;padding:.75rem 1rem;border:0;border-radius:.6rem;background:var(--dlbr-age-check-primary,#172033);color:var(--dlbr-age-check-on-primary,#fff);font:inherit;font-weight:650;cursor:pointer}",
   ".button:focus-visible,.wallet-link:focus-visible{outline:3px solid var(--dlbr-age-check-focus,#75d64b);outline-offset:3px}",
+  ".reset-button:focus-visible{outline:3px solid var(--dlbr-age-check-focus,#75d64b);outline-offset:3px}",
   ".button:disabled{cursor:wait;opacity:.72}",
   ".status{min-height:1.5rem;margin:.75rem 0 0;line-height:1.5}",
   ".request{display:grid;justify-items:start;gap:.75rem;margin-top:1rem}",
   ".qr{display:block;width:min(15rem,100%);height:auto;border:1px solid #e2e8f0;border-radius:.5rem;background:#fff}",
   ".wallet-link{color:var(--dlbr-age-check-link,#176b45);font-weight:650}",
+  ".countdown{margin:0;color:var(--dlbr-age-check-muted,#475569);font-variant-numeric:tabular-nums}",
+  ".reset-button{padding:.35rem 0;border:0;background:transparent;color:var(--dlbr-age-check-link,#176b45);font:inherit;font-weight:650;text-decoration:underline;cursor:pointer}",
   ".error{color:var(--dlbr-age-check-error,#a12622)}",
   "[hidden]{display:none!important}",
   "</style>",
@@ -36,6 +39,8 @@ const template = [
   "<div class=\"request\" part=\"request\" hidden>",
   "<img class=\"qr\" part=\"qr\" alt=\"Scan this wallet request with your digital identity wallet\" hidden>",
   "<a class=\"wallet-link\" part=\"wallet-link\">Open in wallet</a>",
+  "<p class=\"countdown\" part=\"countdown\" hidden></p>",
+  "<button class=\"reset-button\" part=\"reset-button\" type=\"button\">Reset session</button>",
   "</div>",
   "</section>",
 ].join("");
@@ -79,6 +84,10 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
     private state: ViewState = "idle";
     private polling = false;
     private pollTimer: number | undefined;
+    private countdownTimer: number | undefined;
+    private expiresAt: number | undefined;
+    private generation = 0;
+    private abortController: AbortController | undefined;
     private statusUrl = "";
     private walletUrl = "";
     private busy = false;
@@ -90,27 +99,63 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
         root.querySelector<HTMLButtonElement>(".button")?.addEventListener("click", () => {
           void this.start();
         });
+        root.querySelector<HTMLButtonElement>(".reset-button")?.addEventListener("click", () => {
+          this.resetAndStart();
+        });
       } else if (this.state === "pending" || this.state === "starting") {
-        this.polling = false;
-        this.busy = false;
-        this.statusUrl = "";
-        this.walletUrl = "";
+        this.cancelActiveSession();
         this.setState("idle");
       }
       this.renderState();
     }
 
     disconnectedCallback(): void {
+      this.cancelActiveSession();
+    }
+
+    private cancelActiveSession(): void {
+      this.generation += 1;
+      this.abortController?.abort();
+      this.abortController = undefined;
       this.polling = false;
       this.busy = false;
       if (this.pollTimer !== undefined) {
         window.clearTimeout(this.pollTimer);
         this.pollTimer = undefined;
       }
+      this.clearCountdownTimer();
+      this.expiresAt = undefined;
+      this.statusUrl = "";
+      this.walletUrl = "";
+      this.shadowRoot?.querySelector<HTMLImageElement>(".qr")?.removeAttribute("src");
+    }
+
+    private clearCountdownTimer(): void {
+      if (this.countdownTimer !== undefined) {
+        window.clearTimeout(this.countdownTimer);
+        this.countdownTimer = undefined;
+      }
+    }
+
+    private isCurrent(generation: number): boolean {
+      return this.isConnected && generation === this.generation;
+    }
+
+    private resetAndStart(): void {
+      if (this.state !== "pending") return;
+      const oldStatusUrl = this.statusUrl;
+      this.cancelActiveSession();
+      this.setState("idle");
+      if (oldStatusUrl) void fetch(oldStatusUrl, {
+        method: "DELETE",
+        credentials: "same-origin",
+      }).catch(() => undefined);
+      void this.start();
     }
 
     private setState(state: ViewState): void {
       this.state = state;
+      if (state !== "pending") this.clearCountdownTimer();
       this.setAttribute("data-state", state);
       this.renderState();
     }
@@ -123,7 +168,8 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
       const request = root.querySelector<HTMLDivElement>(".request");
       const link = root.querySelector<HTMLAnchorElement>(".wallet-link");
       const image = root.querySelector<HTMLImageElement>(".qr");
-      if (!button || !status || !request || !link || !image) return;
+      const countdown = root.querySelector<HTMLParagraphElement>(".countdown");
+      if (!button || !status || !request || !link || !image || !countdown) return;
 
       button.textContent = buttonLabels[this.state];
       button.disabled = isBusy(this.state);
@@ -132,6 +178,31 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
       request.hidden = this.state !== "pending";
       link.href = this.walletUrl;
       image.hidden = this.state !== "pending" || image.getAttribute("src") === null;
+      countdown.hidden = this.state !== "pending" || this.expiresAt === undefined;
+      if (!countdown.hidden && this.expiresAt !== undefined) {
+        const seconds = Math.max(0, Math.ceil((this.expiresAt - Date.now()) / 1_000));
+        countdown.textContent = `Time remaining: ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+      }
+    }
+
+    private tickCountdown(generation: number): void {
+      if (!this.isCurrent(generation) || this.state !== "pending" || this.expiresAt === undefined) return;
+      if (Date.now() >= this.expiresAt) {
+        this.expireSession(generation);
+        return;
+      }
+      this.renderState();
+      this.countdownTimer = window.setTimeout(() => {
+        this.countdownTimer = undefined;
+        this.tickCountdown(generation);
+      }, Math.min(1_000, this.expiresAt - Date.now()));
+    }
+
+    private expireSession(generation: number): void {
+      if (!this.isCurrent(generation)) return;
+      this.cancelActiveSession();
+      this.setState("expired");
+      this.dispatchAgeEvent("age-verification-expired", { status: "EXPIRED" });
     }
 
     private getPollInterval(): number {
@@ -241,8 +312,12 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
           this.dispatchAgeEvent("age-verification-expired", { status: "EXPIRED" });
           return;
         }
-        this.setState("failed");
-        this.dispatchAgeEvent("age-verification-failed", { status: "FAILED" });
+        this.setState(result.code === "ISSUER_TRUST_INVALID" ? "error" : "failed");
+        this.dispatchAgeEvent("age-verification-failed", {
+          status: "FAILED",
+          ...(result.code ? { code: result.code } : {}),
+          ...(result.request_id ? { request_id: result.request_id } : {}),
+        });
       } catch {
         if (!this.isConnected) return;
         this.polling = false;

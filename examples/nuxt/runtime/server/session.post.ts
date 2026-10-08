@@ -43,5 +43,5 @@ export default defineEventHandler(async (event) => {
     path: useRuntimeConfig(event).public.dlbrAgeCheck.endpoint,
     maxAge: Math.max(1, Math.floor((expiresAt - Date.now()) / 1000)),
   });
-  return { session_id: session.session_id, qr_code_url: session.qr_code_url };
+  return { session_id: session.session_id, qr_code_url: session.qr_code_url, expires_at: new Date(expiresAt).toISOString() };
 });

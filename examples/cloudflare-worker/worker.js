@@ -15,7 +15,7 @@ function jsonResponse(body, status = 200, headers = {}) {
   });
 }
 
-function getGateway(env) {
+function getGateway(env, diagnostics) {
   if (
     !env.DLBR_EID_BASE_URL ||
     !env.DLBR_EID_API_KEY ||
@@ -28,7 +28,22 @@ function getGateway(env) {
   return new DlbrId({
     baseUrl: env.DLBR_EID_BASE_URL,
     apiKey: env.DLBR_EID_API_KEY,
-    fetch: globalThis.fetch.bind(globalThis),
+    // Older SDK releases omit failure_category from their parsed session result.
+    // Keep only the public trust category and tracing reference for this request.
+    fetch: async (input, init) => {
+      const response = await globalThis.fetch(input, init);
+      if (diagnostics && response.ok) {
+        const body = await response.clone().json().catch(() => null);
+        if (body?.status === "FAILED" && body.failure_category === "ISSUER_TRUST_INVALID") {
+          diagnostics.code = "ISSUER_TRUST_INVALID";
+          const requestId = response.headers.get("X-Request-Id");
+          if (requestId && /^req_[A-Za-z0-9_-]{1,128}$/.test(requestId)) {
+            diagnostics.request_id = requestId;
+          }
+        }
+      }
+      return response;
+    },
     maxNetworkRetries: 1,
     timeoutMs: 10_000,
   });
@@ -146,7 +161,7 @@ async function createSession(request, env, url) {
     ).bind(session.session_id, await hashToken(browserToken), expiresAt).run();
 
     return jsonResponse(
-      { session_id: session.session_id, qr_code_url: session.qr_code_url },
+      { session_id: session.session_id, qr_code_url: session.qr_code_url, expires_at: session.expires_at },
       201,
       { "Set-Cookie": cookieHeader(browserToken, url) },
     );
@@ -188,7 +203,8 @@ async function readSession(request, env, sessionId) {
       return jsonResponse({ status: "EXPIRED" });
     }
 
-    const session = await getGateway(env).sessions.retrieve(sessionId);
+    const diagnostics = {};
+    const session = await getGateway(env, diagnostics).sessions.retrieve(sessionId);
     if (session.status === "VERIFIED") {
       const ageOver18 = getAgeOver18(session.claims);
       await env.SESSIONS.prepare("DELETE FROM age_check_sessions WHERE session_id = ?").bind(sessionId).run();
@@ -198,7 +214,7 @@ async function readSession(request, env, sessionId) {
     }
     if (session.status === "FAILED" || session.status === "EXPIRED") {
       await env.SESSIONS.prepare("DELETE FROM age_check_sessions WHERE session_id = ?").bind(sessionId).run();
-      return jsonResponse({ status: session.status });
+      return jsonResponse({ status: session.status, ...diagnostics });
     }
     return jsonResponse({ status: "PENDING" });
   } catch {

@@ -26,6 +26,7 @@ export async function createAgeCheckSession() {
   return {
     session_id: session.session_id,
     qr_code_url: session.qr_code_url,
+    expires_at: session.expires_at,
   };
 }
 
