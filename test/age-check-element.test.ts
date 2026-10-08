@@ -168,7 +168,10 @@ describe("age-check custom element", () => {
   });
 
   it("shows a recoverable error when session creation fails", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(response({}, false) as Response);
+    vi.mocked(fetch).mockResolvedValueOnce(response({
+      code: "ISSUER_NOT_ALLOWED",
+      request_id: "req_demo123",
+    }, false) as Response);
     const widget = mountWidget();
     const listener = vi.fn();
     widget.addEventListener("age-verification-error", listener);
@@ -176,6 +179,9 @@ describe("age-check custom element", () => {
     await waitForState(widget, "error");
 
     expect(listener).toHaveBeenCalledOnce();
+    expect(listener.mock.calls[0][0]).toMatchObject({
+      detail: { status: "ERROR", code: "ISSUER_NOT_ALLOWED", request_id: "req_demo123" },
+    });
     expect(shadow(widget).querySelector<HTMLButtonElement>(".button")?.disabled).toBe(false);
     expect(shadow(widget).querySelector(".status")?.textContent).toContain("temporarily unavailable");
   });

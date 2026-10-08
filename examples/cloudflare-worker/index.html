@@ -13,6 +13,8 @@
       #restricted-content { margin-top: 1rem; padding: 1rem 1.25rem; border: 1px solid #bbf7d0; border-radius: .75rem; background: #f0fdf4; }
       #restricted-content[hidden] { display: none; }
       .note { margin-top: 2rem; font-size: .9rem; }
+      #demo-help { padding: .75rem 1rem; border-left: .25rem solid #b45309; background: #fffbeb; }
+      #demo-help[hidden] { display: none; }
       dlbr-age-check { --dlbr-age-check-primary: #14532d; --dlbr-age-check-focus: #a3e635; }
     </style>
   </head>
@@ -25,6 +27,7 @@
         <h2>Age verified</h2>
         <p>Your application decides what access to grant after verification.</p>
       </section>
+      <p id="demo-help" class="note" role="status" aria-live="polite" hidden></p>
       <p class="note">Demo only: the Gateway relying party must register this Proof of Age use, and your wallet must support the configured issuer.</p>
     </main>
     <script type="module" src="/src/client.js"></script>

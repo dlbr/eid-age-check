@@ -62,6 +62,13 @@ const buttonLabels: Record<ViewState, string> = {
   error: "Try age verification again",
 };
 
+const publicErrorCodes = new Set([
+  "ISSUER_NOT_ALLOWED",
+  "INTENDED_USE_NOT_ACTIVE",
+  "DEMO_CONFIGURATION_ERROR",
+  "GATEWAY_UNAVAILABLE",
+]);
+
 function isBusy(state: ViewState): boolean {
   return state === "starting" || state === "pending" || state === "verified";
 }
@@ -140,6 +147,7 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
       if (this.busy || this.state === "verified") return;
       this.busy = true;
       this.setState("starting");
+      let errorDetail: { code?: string; request_id?: string } = {};
       try {
         const endpoint = this.getAttribute("endpoint") ?? defaultEndpoint;
         const baseURI = document.baseURI;
@@ -148,7 +156,16 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
           credentials: "same-origin",
           headers: { Accept: "application/json" },
         });
-        if (!response.ok) throw new Error("The merchant endpoint could not start an age check.");
+        if (!response.ok) {
+          const body = await response.json().catch(() => undefined) as { code?: unknown; request_id?: unknown } | undefined;
+          errorDetail = {
+            ...(typeof body?.code === "string" && publicErrorCodes.has(body.code) ? { code: body.code } : {}),
+            ...(typeof body?.request_id === "string" && /^req_[A-Za-z0-9_-]{1,128}$/.test(body.request_id)
+              ? { request_id: body.request_id }
+              : {}),
+          };
+          throw new Error("The merchant endpoint could not start an age check.");
+        }
         const created = parseCreateSessionResponse(await response.json());
         this.walletUrl = created.qr_code_url;
         this.statusUrl = createStatusUrl(endpoint, created.session_id, baseURI).href;
@@ -162,7 +179,7 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
         this.busy = false;
         this.polling = false;
         this.setState("error");
-        this.dispatchAgeEvent("age-verification-error", { status: "ERROR" });
+        this.dispatchAgeEvent("age-verification-error", { status: "ERROR", ...errorDetail });
       }
     }
 

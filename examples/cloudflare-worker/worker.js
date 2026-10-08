@@ -59,8 +59,21 @@ function logSessionFailure(stage, error) {
     causeCode: safeCode(cause?.code),
     nestedCauseName: safeName(nestedCause),
     nestedCauseCode: safeCode(nestedCause?.code),
+    publicCode: getPublicFailureCode(stage, error),
   };
   console.error("Age-check session creation failed", details);
+  return details;
+}
+
+function getPublicFailureCode(stage, error) {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (error?.code === "ERR_ISSUER_NOT_ALLOWED" || message.includes("issuer is not allowed")) {
+    return "ISSUER_NOT_ALLOWED";
+  }
+  if (error?.code === "ERR_INTENDED_USE_NOT_ALLOWED" || message.includes("intended use is not active")) {
+    return "INTENDED_USE_NOT_ACTIVE";
+  }
+  return stage === "gateway_configuration" ? "DEMO_CONFIGURATION_ERROR" : "GATEWAY_UNAVAILABLE";
 }
 
 function readCookie(request, name) {
@@ -138,8 +151,12 @@ async function createSession(request, env, url) {
       { "Set-Cookie": cookieHeader(browserToken, url) },
     );
   } catch (error) {
-    logSessionFailure(stage, error);
-    return jsonResponse({ error: "Could not start age verification." }, 503);
+    const failure = logSessionFailure(stage, error);
+    return jsonResponse({
+      error: "Could not start age verification.",
+      code: failure.publicCode,
+      request_id: failure.requestId,
+    }, 503);
   }
 }
 
