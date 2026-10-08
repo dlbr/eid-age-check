@@ -147,7 +147,10 @@ async function createSession(request, env, url) {
   if (request.headers.get("Sec-Fetch-Site") === "cross-site") {
     return jsonResponse({ error: "Cross-site requests are not allowed." }, 403);
   }
-  if (request.body !== null) {
+  // Cloudflare may expose an empty POST as a non-null stream. Only reject a
+  // declared non-empty body; this endpoint never reads or uses body data.
+  const contentLength = request.headers.get("Content-Length");
+  if (contentLength !== null && contentLength !== "0") {
     return jsonResponse({ error: "Request body not allowed." }, 413);
   }
   const limited = await limitRequest(env.CREATE_LIMITER, request);
