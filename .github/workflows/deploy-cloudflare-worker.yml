@@ -6,6 +6,7 @@ on:
     paths:
       - "examples/cloudflare-worker/**"
       - "src/**"
+      - "scripts/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/deploy-cloudflare-worker.yml"
@@ -13,6 +14,7 @@ on:
     paths:
       - "examples/cloudflare-worker/**"
       - "src/**"
+      - "scripts/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/deploy-cloudflare-worker.yml"
@@ -45,7 +47,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm run test:coverage
+      - run: pnpm validate
 
       - run: pnpm install --frozen-lockfile
         working-directory: examples/cloudflare-worker

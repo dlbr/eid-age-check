@@ -66,10 +66,11 @@ pnpm run deploy
 
 ## CI/CD deployment
 
-`.github/workflows/deploy-cloudflare-worker.yml` runs the package coverage gate
-(90% minimum in statements, branches, functions, and lines) and demo build on
-pull requests. It deploys to `demo.dlbr.app` from `main` after those checks
-pass. Configure these GitHub repository settings:
+`.github/workflows/deploy-cloudflare-worker.yml` runs the full package
+validation (build, 90% coverage gate, and package contents check) and demo
+build on pull requests. It deploys to `demo.dlbr.app` from `main` after those
+checks pass. Changes to the package, demo, or package-check script trigger the
+workflow. Configure these GitHub repository settings:
 
 - Secret `CLOUDFLARE_API_TOKEN`: a token with Workers Scripts, D1, and DNS edit
   permissions for the `dlbr.app` zone.
