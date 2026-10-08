@@ -1,13 +1,23 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const manifest = JSON.parse(execFileSync(npm, ["pack", "--dry-run", "--json"], {
-  cwd: new URL("..", import.meta.url),
-  encoding: "utf8",
-  maxBuffer: 10 * 1024 * 1024,
-}))[0];
+const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const packDirectory = mkdtempSync(join(tmpdir(), "eid-age-check-pack-"));
+let manifest;
+let packedBytes;
+try {
+  manifest = JSON.parse(execFileSync(pnpm, ["pack", "--json", "--pack-destination", packDirectory], {
+    cwd: new URL("..", import.meta.url),
+    encoding: "utf8",
+    maxBuffer: 10 * 1024 * 1024,
+  }));
+  packedBytes = statSync(manifest.filename).size;
+} finally {
+  rmSync(packDirectory, { recursive: true, force: true });
+}
 const paths = new Set(manifest.files.map((file) => file.path));
 const explicitFiles = packageJson.files.filter((file) => !["dist", "types", "README.md"].includes(file));
 const allowed = new Set(["LICENSE", "README.md", "package.json", ...explicitFiles]);
@@ -29,4 +39,4 @@ if (unexpected.length || unsafe.length || missing.length || missingExports.lengt
   throw new Error(JSON.stringify({ unexpected, unsafe, missing, missingExports }, null, 2));
 }
 
-console.log(`Package check passed: ${manifest.entryCount} files, ${manifest.size} packed bytes.`);
+console.log(`Package check passed: ${manifest.files.length} files, ${packedBytes} packed bytes.`);
