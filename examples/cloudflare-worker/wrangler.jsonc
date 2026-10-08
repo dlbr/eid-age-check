@@ -10,7 +10,7 @@
   ],
   "vars": {
     "DLBR_EID_BASE_URL": "https://api.dlbr.app",
-    "DLBR_EID_AGE_ISSUER_ID": "https://issuer.eudiw.dev"
+    "DLBR_EID_AGE_ISSUER_ID": "https://issuer.ageverification.dev"
   },
   "assets": {
     "directory": "./dist",

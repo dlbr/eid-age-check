@@ -3,7 +3,9 @@
 This demo serves the plain JavaScript age-check page as a Workers Static Asset
 and handles the age-check API in a module Worker. D1 stores the Gateway session
 ID and a hash of an opaque browser cookie so a different browser cannot poll the
-session. The API key stays in Worker secrets.
+session. The API key stays in Worker secrets. Static asset security and cache
+headers are configured in `public/_headers`; API responses receive their headers
+from the Worker.
 
 ## Configure
 
@@ -23,14 +25,24 @@ all-zero placeholder:
 pnpm exec wrangler d1 create eid-age-check-demo
 ```
 
-The Worker uses the DLBR production API base URL and EUDI reference Proof of Age
-issuer by default; change those `vars` in `wrangler.jsonc` if needed. Register an
-intended use for the relying party that permits this issuer, `mso_mdoc`, the
-`eu.europa.ec.av.1` document type, and the `age_over_18` claim. Set
-`DLBR_EID_INTENDED_USE_ID` to that exact registered `intendedUseIdentifier`.
+The Worker uses the DLBR API and the EU Age Verification reference issuer,
+`https://issuer.ageverification.dev`. The generic EUDI reference issuer at
+`https://issuer.eudiw.dev` provides PID/mDL credentials by default, not the
+Proof of Age credential requested here. The AV reference issuer supports the
+`mso_mdoc` Proof of Age credential with document type and namespace
+`eu.europa.ec.av.1`.
+
+Before testing, issue and store that Proof of Age credential in a compatible Age
+Verification wallet. The relying-party policy must allow
+`https://issuer.ageverification.dev`, `mso_mdoc`, `eu.europa.ec.av.1`, and only
+the requested `age_over_18` claim for this issuer. It must also register the
+demo origin `https://demo.dlbr.app`. Keep the existing registered
+`intendedUseIdentifier` and set `DLBR_EID_INTENDED_USE_ID` to it. A PID or mDL
+credential from the generic EUDI issuer will not satisfy this request.
+
 For local development, copy `.dev.vars.example` to `.dev.vars`, then enter a
-test API key and the intended-use identifier. Apply the schema to the local D1
-database:
+test API key for the same relying party and its intended-use identifier. Apply
+the schema to the local D1 database:
 
 ```sh
 cp .dev.vars.example .dev.vars
