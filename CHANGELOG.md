@@ -7,4 +7,4 @@
 - Plain JavaScript, Vue, Next.js, Nuxt, Astro, and Svelte examples.
 - Plug-and-play Nuxt module with server-only Gateway credentials and signed
   browser-to-session binding.
-- Unit coverage thresholds and Playwright E2E flow.
+- Unit coverage thresholds and simulated customer-flow coverage with Vitest.

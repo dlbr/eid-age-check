@@ -196,10 +196,10 @@ pnpm install
 pnpm validate
 ~~~~
 
-Validation builds the ESM and no-bundler IIFE entrypoints, runs unit tests with
-90% minimum statement, branch, function, and line coverage, then runs Playwright
-browser tests against a mocked merchant endpoint. E2E tests do not call a live
-Gateway or a real wallet.
+Validation builds the ESM and no-bundler IIFE entrypoints, then runs Vitest in
+happy-dom with 90% minimum statement, branch, function, and line coverage.
+Tests mock the merchant endpoint and do not call a live Gateway or a real
+wallet. The UI tests simulate the DOM and do not replace a real-browser QA pass.
 
 ## Limitations
 

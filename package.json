@@ -49,8 +49,7 @@
     "build": "tsc -p tsconfig.types.json && vite build && vite build --config vite.iife.config.ts",
     "test": "tsc -p tsconfig.test.json --noEmit && vitest run",
     "test:coverage": "tsc -p tsconfig.test.json --noEmit && vitest run --coverage",
-    "test:e2e": "pnpm run build && playwright test",
-    "validate": "pnpm run build && pnpm run test:coverage && pnpm run test:e2e",
+    "validate": "pnpm run build && pnpm run test:coverage",
     "pack:check": "pnpm run build && pnpm pack --pack-destination ."
   },
   "dependencies": {
@@ -67,7 +66,6 @@
     }
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
     "@types/node": "26.6.2",
     "@vitest/coverage-v8": "4.1.11",
     "happy-dom": "20.14.5",

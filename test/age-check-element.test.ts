@@ -100,6 +100,25 @@ describe("age-check custom element", () => {
     expect(listener.mock.calls[0][0]).toMatchObject({ detail: { age_over_18: true }, bubbles: true, composed: true });
   });
 
+  it("lets a merchant reveal restricted content only after age is verified", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response({ session_id: "s-access", qr_code_url: "https://wallet.example/request" }) as Response)
+      .mockResolvedValueOnce(response({ status: "VERIFIED", age_over_18: true }) as Response);
+
+    const restrictedContent = document.createElement("section");
+    restrictedContent.hidden = true;
+    document.body.append(restrictedContent);
+
+    const widget = mountWidget();
+    widget.addEventListener("age-verified", () => {
+      restrictedContent.hidden = false;
+    });
+    clickButton(widget);
+
+    await waitForState(widget, "verified");
+    expect(restrictedContent.hidden).toBe(false);
+  });
+
   it("distinguishes a verified under-18 result from a successful age check", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(response({ session_id: "s-false", qr_code_url: "https://wallet.example/request" }) as Response)
