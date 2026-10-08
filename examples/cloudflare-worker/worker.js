@@ -2,6 +2,8 @@ import { DlbrId } from "@dlbr/eid-sdk";
 
 const cookieName = "dlbr_age_check";
 const sessionLifetimeSeconds = 30 * 60;
+const sessionPath = "/api/age-check/sessions";
+const sessionIdPattern = /^[A-Za-z0-9._~-]{1,256}$/;
 
 function jsonResponse(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
@@ -10,6 +12,8 @@ function jsonResponse(body, status = 200, headers = {}) {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+      "Cross-Origin-Resource-Policy": "same-origin",
       ...headers,
     },
   });
@@ -115,9 +119,22 @@ async function hashToken(token) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function cookieHeader(token, requestUrl) {
+function cookieHeader(token, requestUrl, expiresAt) {
   const secure = requestUrl.protocol === "https:" ? "; Secure" : "";
-  return `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${sessionLifetimeSeconds}${secure}`;
+  const maxAge = Math.max(1, Math.ceil((expiresAt - Date.now()) / 1_000));
+  return `${cookieName}=${token}; Path=${sessionPath}; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`;
+}
+
+async function limitRequest(limiter, request) {
+  // The demo has no authenticated account to key on. Cloudflare supplies this header
+  // at its edge; anonymous users sharing an IP share the limit.
+  const key = request.headers.get("CF-Connecting-IP") || "unknown";
+  const { success } = await limiter.limit({ key });
+  return success ? null : jsonResponse(
+    { error: "Too many age-check requests. Please try again shortly." },
+    429,
+    { "Retry-After": "60" },
+  );
 }
 
 async function createSession(request, env, url) {
@@ -127,6 +144,14 @@ async function createSession(request, env, url) {
   if (request.headers.get("Origin") !== url.origin) {
     return jsonResponse({ error: "Origin not allowed." }, 403);
   }
+  if (request.headers.get("Sec-Fetch-Site") === "cross-site") {
+    return jsonResponse({ error: "Cross-site requests are not allowed." }, 403);
+  }
+  if (request.body !== null) {
+    return jsonResponse({ error: "Request body not allowed." }, 413);
+  }
+  const limited = await limitRequest(env.CREATE_LIMITER, request);
+  if (limited) return limited;
 
   let stage = "gateway_configuration";
   try {
@@ -151,19 +176,20 @@ async function createSession(request, env, url) {
       : newBrowserToken();
     stage = "gateway_session_response_validation";
     const expiresAt = Date.parse(session.expires_at);
-    if (!session.session_id || !session.qr_code_url || !Number.isFinite(expiresAt)) {
+    if (!sessionIdPattern.test(session.session_id) || !session.qr_code_url || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
       throw new Error("The Gateway returned an invalid session response.");
     }
+    const effectiveExpiresAt = Math.min(expiresAt, Date.now() + sessionLifetimeSeconds * 1_000);
 
     stage = "d1_session_persist";
     await env.SESSIONS.prepare(
       "INSERT INTO age_check_sessions (session_id, browser_token_hash, expires_at) VALUES (?, ?, ?)",
-    ).bind(session.session_id, await hashToken(browserToken), expiresAt).run();
+    ).bind(session.session_id, await hashToken(browserToken), effectiveExpiresAt).run();
 
     return jsonResponse(
-      { session_id: session.session_id, qr_code_url: session.qr_code_url, expires_at: session.expires_at },
+      { session_id: session.session_id, qr_code_url: session.qr_code_url, expires_at: new Date(effectiveExpiresAt).toISOString() },
       201,
-      { "Set-Cookie": cookieHeader(browserToken, url) },
+      { "Set-Cookie": cookieHeader(browserToken, url, effectiveExpiresAt) },
     );
   } catch (error) {
     const failure = logSessionFailure(stage, error);
@@ -182,10 +208,18 @@ function getAgeOver18(claims) {
 }
 
 async function readSession(request, env, sessionId) {
-  if (request.method !== "GET") {
-    return jsonResponse({ error: "Method not allowed." }, 405, { Allow: "GET" });
+  if (request.method !== "GET" && request.method !== "DELETE") {
+    return jsonResponse({ error: "Method not allowed." }, 405, { Allow: "GET, DELETE" });
   }
-  if (!sessionId || sessionId.length > 256) return jsonResponse({ error: "Session not found." }, 404);
+  if (request.method === "DELETE" && request.headers.get("Origin") !== new URL(request.url).origin) {
+    return jsonResponse({ error: "Origin not allowed." }, 403);
+  }
+  if (request.headers.get("Sec-Fetch-Site") === "cross-site") {
+    return jsonResponse({ error: "Cross-site requests are not allowed." }, 403);
+  }
+  if (!sessionIdPattern.test(sessionId)) return jsonResponse({ error: "Session not found." }, 404);
+  const limited = await limitRequest(env.SESSION_LIMITER, request);
+  if (limited) return limited;
 
   try {
     const browserToken = readCookie(request, cookieName);
@@ -197,6 +231,25 @@ async function readSession(request, env, sessionId) {
       "SELECT expires_at FROM age_check_sessions WHERE session_id = ? AND browser_token_hash = ?",
     ).bind(sessionId, tokenHash).first();
     if (!stored) return jsonResponse({ error: "Session not found." }, 404);
+
+    if (request.method === "DELETE") {
+      try {
+        await getGateway(env).sessions.cancel(sessionId);
+      } catch {
+        // Removing the browser binding still prevents this site from accepting the old result.
+      }
+      await env.SESSIONS.prepare(
+        "DELETE FROM age_check_sessions WHERE session_id = ? AND browser_token_hash = ?",
+      ).bind(sessionId, tokenHash).run();
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Cache-Control": "no-store",
+          "Referrer-Policy": "no-referrer",
+          "Cross-Origin-Resource-Policy": "same-origin",
+        },
+      });
+    }
 
     if (Date.now() >= stored.expires_at) {
       await env.SESSIONS.prepare("DELETE FROM age_check_sessions WHERE session_id = ?").bind(sessionId).run();

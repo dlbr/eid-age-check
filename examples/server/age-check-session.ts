@@ -50,3 +50,8 @@ export async function readAgeCheckResult(sessionId: string) {
   }
   return { status: "VERIFIED", age_over_18: ageOver18 };
 }
+
+/** Cancel a pending session after checking that it belongs to this browser. */
+export async function cancelAgeCheckSession(sessionId: string) {
+  await id.sessions.cancel(sessionId);
+}

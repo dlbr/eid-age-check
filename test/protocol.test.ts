@@ -97,6 +97,14 @@ describe("session response validation", () => {
     });
   });
 
+  it("accepts a valid expiration and rejects malformed values", () => {
+    const base = { session_id: "s1", qr_code_url: "https://wallet.example/request" };
+    expect(parseCreateSessionResponse({ ...base, expires_at: "2026-10-08T12:00:00Z" }))
+      .toEqual({ ...base, expires_at: "2026-10-08T12:00:00Z" });
+    expect(() => parseCreateSessionResponse({ ...base, expires_at: "not-a-date" }))
+      .toThrow("session expiration is invalid");
+  });
+
   it.each([null, [], "session"])("rejects non-object session responses (%j)", (value) => {
     expect(() => parseCreateSessionResponse(value)).toThrow("session response is invalid");
   });

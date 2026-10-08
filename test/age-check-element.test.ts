@@ -79,10 +79,153 @@ describe("age-check custom element", () => {
     expect(shadow(widget).querySelector(".status")?.textContent).toContain("Scan the code");
     expect(shadow(widget).querySelector<HTMLImageElement>(".qr")?.src).toBe("data:image/png;base64,e2e");
     expect(shadow(widget).querySelector<HTMLAnchorElement>(".wallet-link")?.href).toBe(walletUrl);
+    expect(shadow(widget).querySelector<HTMLParagraphElement>(".countdown")?.hidden).toBe(true);
     expect(fetch).toHaveBeenNthCalledWith(1, new URL("https://shop.example/api/age-check/sessions"), expect.objectContaining({
       method: "POST",
       credentials: "same-origin",
     }));
+  });
+
+  it("counts down to expiry and stops polling when time runs out", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-08T12:00:00Z"));
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response({
+        session_id: "s-timed",
+        qr_code_url: "https://wallet.example/request",
+        expires_at: "2026-10-08T12:00:02.500Z",
+      }) as Response)
+      .mockResolvedValueOnce(response({ status: "PENDING" }) as Response);
+
+    const widget = mountWidget("/api/age-check", { "poll-interval": "30000" });
+    const expired = vi.fn();
+    widget.addEventListener("age-verification-expired", expired);
+    clickButton(widget);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(widget.getAttribute("data-state")).toBe("pending");
+    expect(shadow(widget).querySelector(".countdown")?.textContent).toBe("Time remaining: 0:03");
+    expect(shadow(widget).querySelector<HTMLParagraphElement>(".countdown")?.hidden).toBe(false);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(shadow(widget).querySelector(".countdown")?.textContent).toBe("Time remaining: 0:02");
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(widget.getAttribute("data-state")).toBe("expired");
+    expect(expired).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("expires immediately when a session arrives after its deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-08T12:00:00Z"));
+    vi.mocked(fetch).mockResolvedValueOnce(response({
+      session_id: "already-expired",
+      qr_code_url: "https://wallet.example/request",
+      expires_at: "2026-10-08T12:00:00Z",
+    }) as Response);
+
+    const widget = mountWidget();
+    const expired = vi.fn();
+    widget.addEventListener("age-verification-expired", expired);
+    clickButton(widget);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(widget.getAttribute("data-state")).toBe("expired");
+    expect(expired).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not expire after a verified result arrives before the deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-08T12:00:00Z"));
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response({
+        session_id: "s-fast",
+        qr_code_url: "https://wallet.example/request",
+        expires_at: "2026-10-08T12:00:02Z",
+      }) as Response)
+      .mockResolvedValueOnce(response({ status: "VERIFIED", age_over_18: true }) as Response);
+
+    const widget = mountWidget();
+    const expired = vi.fn();
+    widget.addEventListener("age-verification-expired", expired);
+    clickButton(widget);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(widget.getAttribute("data-state")).toBe("verified");
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(widget.getAttribute("data-state")).toBe("verified");
+    expect(expired).not.toHaveBeenCalled();
+  });
+
+  it("resets to a fresh session and ignores the old in-flight result", async () => {
+    let resolveOldStatus!: (value: Response) => void;
+    const oldStatus = new Promise<Response>((resolve) => { resolveOldStatus = resolve; });
+    const oldExpiry = new Date(Date.now() + 30_000).toISOString();
+    const newExpiry = new Date(Date.now() + 120_000).toISOString();
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response({ session_id: "old", qr_code_url: "https://wallet.example/old", expires_at: oldExpiry }) as Response)
+      .mockReturnValueOnce(oldStatus)
+      .mockRejectedValueOnce(new Error("Cancellation unavailable"))
+      .mockResolvedValueOnce(response({ session_id: "new", qr_code_url: "https://wallet.example/new", expires_at: newExpiry }) as Response)
+      .mockResolvedValueOnce(response({ status: "PENDING" }) as Response);
+
+    const widget = mountWidget();
+    const verified = vi.fn();
+    widget.addEventListener("age-verified", verified);
+    clickButton(widget);
+    await waitForState(widget, "pending");
+    expect(shadow(widget).querySelector(".countdown")?.textContent).toContain("Time remaining: 0:");
+    const oldSignal = vi.mocked(fetch).mock.calls[1][1]?.signal;
+
+    shadow(widget).querySelector<HTMLButtonElement>(".reset-button")?.click();
+    await vi.waitFor(() => expect(shadow(widget).querySelector<HTMLAnchorElement>(".wallet-link")?.href)
+      .toBe("https://wallet.example/new"));
+    expect(oldSignal?.aborted).toBe(true);
+    expect(fetch).toHaveBeenNthCalledWith(3, "https://shop.example/api/age-check/sessions/old", expect.objectContaining({
+      method: "DELETE",
+      credentials: "same-origin",
+    }));
+    expect(widget.getAttribute("data-state")).toBe("pending");
+    expect(shadow(widget).querySelector(".countdown")?.textContent).toContain("Time remaining: 2:");
+
+    resolveOldStatus(response({ status: "VERIFIED", age_over_18: true }) as Response);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(widget.getAttribute("data-state")).toBe("pending");
+    expect(verified).not.toHaveBeenCalled();
+    widget.remove();
+  });
+
+  it("ignores a session creation response after the widget is removed", async () => {
+    let resolveCreate!: (value: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(new Promise<Response>((resolve) => { resolveCreate = resolve; }));
+
+    const widget = mountWidget();
+    clickButton(widget);
+    widget.remove();
+    resolveCreate(response({ session_id: "old", qr_code_url: "https://wallet.example/request" }) as Response);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(toDataURL).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show a QR code or poll after removal during QR rendering", async () => {
+    let resolveQr!: (value: string) => void;
+    vi.mocked(toDataURL).mockReturnValueOnce(new Promise<string>((resolve) => { resolveQr = resolve; }));
+    vi.mocked(fetch).mockResolvedValueOnce(response({
+      session_id: "s-qr-late",
+      qr_code_url: "https://wallet.example/request",
+    }) as Response);
+
+    const widget = mountWidget();
+    clickButton(widget);
+    await vi.waitFor(() => expect(toDataURL).toHaveBeenCalledOnce());
+    widget.remove();
+    resolveQr("data:image/png;base64,late");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(shadow(widget).querySelector<HTMLImageElement>(".qr")?.getAttribute("src")).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("emits a minimal verified event for age_over_18 true", async () => {

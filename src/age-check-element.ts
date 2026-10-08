@@ -22,22 +22,22 @@ const template = [
   ".button:focus-visible,.wallet-link:focus-visible{outline:3px solid var(--dlbr-age-check-focus,#75d64b);outline-offset:3px}",
   ".reset-button:focus-visible{outline:3px solid var(--dlbr-age-check-focus,#75d64b);outline-offset:3px}",
   ".button:disabled{cursor:wait;opacity:.72}",
-  ".status{min-height:1.5rem;margin:.75rem 0 0;line-height:1.5}",
+  ".status{min-height:1.5rem;margin:0 0 .75rem;line-height:1.5}",
   ".request{display:grid;justify-items:start;gap:.75rem;margin-top:1rem}",
-  ".qr{display:block;width:min(15rem,100%);height:auto;border:1px solid #e2e8f0;border-radius:.5rem;background:#fff}",
+  ".qr{display:block;width:min(15rem,100%);height:auto;margin:0 0 1rem;border:1px solid #e2e8f0;border-radius:.5rem;background:#fff}",
   ".wallet-link{color:var(--dlbr-age-check-link,#176b45);font-weight:650}",
   ".countdown{margin:0;color:var(--dlbr-age-check-muted,#475569);font-variant-numeric:tabular-nums}",
   ".reset-button{padding:.35rem 0;border:0;background:transparent;color:var(--dlbr-age-check-link,#176b45);font:inherit;font-weight:650;text-decoration:underline;cursor:pointer}",
-  ".error{color:var(--dlbr-age-check-error,#a12622)}",
+  ".status.error{padding:.75rem;border:1px solid var(--dlbr-age-check-error,#a12622);border-radius:.5rem;background:var(--dlbr-age-check-error-background,#fff1f2);color:var(--dlbr-age-check-error,#a12622);font-weight:600}",
   "[hidden]{display:none!important}",
   "</style>",
   "<section class=\"card\" part=\"card\">",
   "<h2 class=\"title\" part=\"title\">Age verification</h2>",
   "<p class=\"description\">Confirm that you are over 18 using a supported digital identity wallet.</p>",
-  "<button class=\"button\" part=\"button\" type=\"button\">Verify age with your wallet</button>",
-  "<p class=\"status\" part=\"status\" role=\"status\" aria-live=\"polite\"></p>",
-  "<div class=\"request\" part=\"request\" hidden>",
   "<img class=\"qr\" part=\"qr\" alt=\"Scan this wallet request with your digital identity wallet\" hidden>",
+  "<p class=\"status\" part=\"status\" role=\"status\" aria-live=\"polite\"></p>",
+  "<button class=\"button\" part=\"button\" type=\"button\">Verify age with your wallet</button>",
+  "<div class=\"request\" part=\"request\" hidden>",
   "<a class=\"wallet-link\" part=\"wallet-link\">Open in wallet</a>",
   "<p class=\"countdown\" part=\"countdown\" hidden></p>",
   "<button class=\"reset-button\" part=\"reset-button\" type=\"button\">Reset session</button>",
@@ -146,7 +146,7 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
       const oldStatusUrl = this.statusUrl;
       this.cancelActiveSession();
       this.setState("idle");
-      if (oldStatusUrl) void fetch(oldStatusUrl, {
+      void fetch(oldStatusUrl, {
         method: "DELETE",
         credentials: "same-origin",
       }).catch(() => undefined);
@@ -161,19 +161,18 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
     }
 
     private renderState(): void {
-      const root = this.shadowRoot;
-      if (!root) return;
-      const button = root.querySelector<HTMLButtonElement>(".button");
-      const status = root.querySelector<HTMLParagraphElement>(".status");
-      const request = root.querySelector<HTMLDivElement>(".request");
-      const link = root.querySelector<HTMLAnchorElement>(".wallet-link");
-      const image = root.querySelector<HTMLImageElement>(".qr");
-      const countdown = root.querySelector<HTMLParagraphElement>(".countdown");
-      if (!button || !status || !request || !link || !image || !countdown) return;
+      const root = this.shadowRoot!;
+      const button = root.querySelector<HTMLButtonElement>(".button")!;
+      const status = root.querySelector<HTMLParagraphElement>(".status")!;
+      const request = root.querySelector<HTMLDivElement>(".request")!;
+      const link = root.querySelector<HTMLAnchorElement>(".wallet-link")!;
+      const image = root.querySelector<HTMLImageElement>(".qr")!;
+      const countdown = root.querySelector<HTMLParagraphElement>(".countdown")!;
 
       button.textContent = buttonLabels[this.state];
       button.disabled = isBusy(this.state);
       status.textContent = stateMessages[this.state];
+      status.hidden = this.state === "idle";
       status.classList.toggle("error", this.state === "failed" || this.state === "expired" || this.state === "error");
       request.hidden = this.state !== "pending";
       link.href = this.walletUrl;
@@ -188,7 +187,7 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
     private tickCountdown(generation: number): void {
       if (!this.isCurrent(generation) || this.state !== "pending" || this.expiresAt === undefined) return;
       if (Date.now() >= this.expiresAt) {
-        this.expireSession(generation);
+        this.expireSession();
         return;
       }
       this.renderState();
@@ -198,8 +197,7 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
       }, Math.min(1_000, this.expiresAt - Date.now()));
     }
 
-    private expireSession(generation: number): void {
-      if (!this.isCurrent(generation)) return;
+    private expireSession(): void {
       this.cancelActiveSession();
       this.setState("expired");
       this.dispatchAgeEvent("age-verification-expired", { status: "EXPIRED" });
@@ -216,6 +214,10 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
 
     private async start(): Promise<void> {
       if (this.busy || this.state === "verified") return;
+      this.cancelActiveSession();
+      const generation = this.generation;
+      const controller = new AbortController();
+      this.abortController = controller;
       this.busy = true;
       this.setState("starting");
       let errorDetail: { code?: string; request_id?: string } = {};
@@ -226,7 +228,9 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
           method: "POST",
           credentials: "same-origin",
           headers: { Accept: "application/json" },
+          signal: controller.signal,
         });
+        if (!this.isCurrent(generation)) return;
         if (!response.ok) {
           const body = await response.json().catch(() => undefined) as { code?: unknown; request_id?: unknown } | undefined;
           errorDetail = {
@@ -238,65 +242,74 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
           throw new Error("The merchant endpoint could not start an age check.");
         }
         const created = parseCreateSessionResponse(await response.json());
+        if (!this.isCurrent(generation)) return;
         this.walletUrl = created.qr_code_url;
         this.statusUrl = createStatusUrl(endpoint, created.session_id, baseURI).href;
-        await this.renderWalletRequest(created.qr_code_url);
-        if (!this.isConnected) return;
+        this.expiresAt = created.expires_at === undefined ? undefined : Date.parse(created.expires_at);
+        await this.renderWalletRequest(created.qr_code_url, generation);
+        if (!this.isCurrent(generation)) return;
         this.polling = true;
         this.setState("pending");
-        await this.poll();
+        this.tickCountdown(generation);
+        await this.poll(generation);
       } catch {
-        if (!this.isConnected) return;
+        if (!this.isCurrent(generation)) return;
         this.busy = false;
         this.polling = false;
+        this.abortController = undefined;
         this.setState("error");
         this.dispatchAgeEvent("age-verification-error", { status: "ERROR", ...errorDetail });
       }
     }
 
-    private async renderWalletRequest(walletUrl: string): Promise<void> {
-      const root = this.shadowRoot;
-      const link = root?.querySelector<HTMLAnchorElement>(".wallet-link");
-      const image = root?.querySelector<HTMLImageElement>(".qr");
-      if (!link || !image) return;
+    private async renderWalletRequest(walletUrl: string, generation: number): Promise<void> {
+      const root = this.shadowRoot!;
+      const link = root.querySelector<HTMLAnchorElement>(".wallet-link")!;
+      const image = root.querySelector<HTMLImageElement>(".qr")!;
       link.href = walletUrl;
       image.hidden = true;
       image.removeAttribute("src");
       try {
-        image.src = await toDataURL(walletUrl, {
+        const qrCode = await toDataURL(walletUrl, {
           errorCorrectionLevel: "M",
           margin: 2,
           width: 240,
           color: { dark: "#172033", light: "#ffffff" },
         });
+        if (!this.isCurrent(generation)) return;
+        image.src = qrCode;
         image.hidden = false;
       } catch {
+        if (!this.isCurrent(generation)) return;
         image.hidden = true;
       }
     }
 
-    private async poll(): Promise<void> {
-      if (!this.polling || !this.statusUrl || !this.isConnected) return;
+    private async poll(generation: number): Promise<void> {
+      if (!this.polling || !this.statusUrl || !this.isCurrent(generation)) return;
       try {
         const response = await fetch(this.statusUrl, {
           method: "GET",
           credentials: "same-origin",
           headers: { Accept: "application/json" },
+          signal: this.abortController?.signal,
         });
+        if (!this.isCurrent(generation)) return;
         if (!response.ok) throw new Error("The merchant status endpoint is unavailable.");
         const result: AgeCheckSessionResponse = parseAgeCheckSessionResponse(await response.json());
-        if (!this.isConnected) return;
+        if (!this.isCurrent(generation)) return;
         if (result.status === "PENDING") {
           this.setState("pending");
           this.pollTimer = window.setTimeout(() => {
             this.pollTimer = undefined;
-            void this.poll();
+            void this.poll(generation);
           }, this.getPollInterval());
           return;
         }
 
         this.polling = false;
         this.busy = false;
+        this.abortController = undefined;
         if (result.status === "VERIFIED") {
           if (result.age_over_18) {
             this.setState("verified");
@@ -308,8 +321,7 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
           return;
         }
         if (result.status === "EXPIRED") {
-          this.setState("expired");
-          this.dispatchAgeEvent("age-verification-expired", { status: "EXPIRED" });
+          this.expireSession();
           return;
         }
         this.setState(result.code === "ISSUER_TRUST_INVALID" ? "error" : "failed");
@@ -319,9 +331,10 @@ export function createAgeCheckElementClass(defaultEndpoint = ""): CustomElementC
           ...(result.request_id ? { request_id: result.request_id } : {}),
         });
       } catch {
-        if (!this.isConnected) return;
+        if (!this.isCurrent(generation)) return;
         this.polling = false;
         this.busy = false;
+        this.abortController = undefined;
         this.setState("error");
         this.dispatchAgeEvent("age-verification-error", { status: "ERROR" });
       }

@@ -36,17 +36,25 @@ pnpm add @dlbr/eid-age-check
 The endpoint attribute points to merchant-owned routes:
 
 - <code>POST /api/age-check/sessions</code> creates a Gateway session and
-  returns <code>{ "session_id": "...", "qr_code_url": "openid4vp://..." }</code>.
+  returns <code>{ "session_id": "...", "qr_code_url": "openid4vp://...", "expires_at": "2026-10-08T12:00:00Z" }</code>.
   The Age Verification app uses <code>av://...</code>; the component also accepts
-  this scheme and HTTPS wallet links.
+  this scheme and HTTPS wallet links. The optional ISO 8601 <code>expires_at</code>
+  enables the time-remaining counter; the included server examples return it.
 - <code>GET /api/age-check/sessions/{session_id}</code> returns
   <code>{ "status": "PENDING" }</code>, <code>{ "status": "FAILED" }</code>,
   <code>{ "status": "EXPIRED" }</code>, or
   <code>{ "status": "VERIFIED", "age_over_18": true }</code>.
+- <code>DELETE /api/age-check/sessions/{session_id}</code> cancels a pending
+  session when the user selects <strong>Reset session</strong>. The widget starts
+  a fresh request even if an older merchant endpoint does not support DELETE.
 
 A verified response must contain a boolean. <code>false</code> emits
 <code>age-not-verified</code>, never <code>age-verified</code>.
 <code>CREATED</code> is treated as <code>PENDING</code>.
+While a request is pending, the widget shows time remaining until
+<code>expires_at</code> and offers <strong>Reset session</strong>. At zero it stops
+polling and emits <code>age-verification-expired</code>. A reset ignores late
+responses from the old request.
 
 ## Framework integrations
 

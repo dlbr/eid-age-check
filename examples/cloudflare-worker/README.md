@@ -7,6 +7,14 @@ session. The API key stays in Worker secrets. Static asset security and cache
 headers are configured in `public/_headers`; API responses receive their headers
 from the Worker.
 
+The Worker limits anonymous session creation to 10 requests per minute per
+Cloudflare client IP and session reads or resets to 120 per minute per IP. It
+returns HTTP 429 with `Retry-After: 60` when a limit is reached. These limits
+are enforced per Cloudflare location and are eventually consistent. People
+behind a shared IP share a limit. For higher-volume or adversarial traffic,
+configure a Cloudflare WAF rate-limiting rule on `/api/age-check/sessions*` to
+reject bursts before they execute the Worker.
+
 ## Configure
 
 From the repository root, install the package dependencies, then install the
