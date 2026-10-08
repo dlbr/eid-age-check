@@ -25,7 +25,33 @@
     "dist",
     "types",
     "README.md",
-    "examples"
+    "examples/astro/AgeCheck.astro",
+    "examples/cloudflare-worker/.dev.vars.example",
+    "examples/cloudflare-worker/README.md",
+    "examples/cloudflare-worker/index.html",
+    "examples/cloudflare-worker/migrations/0001_create_age_check_sessions.sql",
+    "examples/cloudflare-worker/package.json",
+    "examples/cloudflare-worker/pnpm-lock.yaml",
+    "examples/cloudflare-worker/pnpm-workspace.yaml",
+    "examples/cloudflare-worker/public/_headers",
+    "examples/cloudflare-worker/src/client.js",
+    "examples/cloudflare-worker/vite.config.js",
+    "examples/cloudflare-worker/worker.js",
+    "examples/cloudflare-worker/wrangler.jsonc",
+    "examples/nextjs/AgeCheck.tsx",
+    "examples/nuxt/README.md",
+    "examples/nuxt/module.d.ts",
+    "examples/nuxt/module.ts",
+    "examples/nuxt/plugins/dlbr-age-check.client.ts",
+    "examples/nuxt/runtime/plugin.client.ts",
+    "examples/nuxt/runtime/server/age-check.ts",
+    "examples/nuxt/runtime/server/session-cookie.ts",
+    "examples/nuxt/runtime/server/session.get.ts",
+    "examples/nuxt/runtime/server/session.post.ts",
+    "examples/plain-javascript/index.html",
+    "examples/server/age-check-session.ts",
+    "examples/svelte/AgeCheck.svelte",
+    "examples/vue/AgeCheck.vue"
   ],
   "exports": {
     ".": {
@@ -49,7 +75,7 @@
     "build": "tsc -p tsconfig.types.json && vite build && vite build --config vite.iife.config.ts",
     "test": "tsc -p tsconfig.test.json --noEmit && vitest run",
     "test:coverage": "tsc -p tsconfig.test.json --noEmit && vitest run --coverage",
-    "validate": "pnpm run build && pnpm run test:coverage",
+    "validate": "pnpm run build && pnpm run test:coverage && node scripts/check-package.mjs",
     "pack:check": "pnpm run build && pnpm pack --pack-destination ."
   },
   "dependencies": {
